@@ -1,0 +1,22 @@
+.extern a, dat1
+.public b
+
+.text
+add al r1, r2
+sub al r3, r4
+.text.sub1
+mov al r4, b
+
+.data
+b: .long a
+LAB1: .skip 8
+.data.subData
+KITA: .word LAB1
+.nemanja
+add al r3, r4
+sub ge r2, r4
+LAB2: .skip 4
+ANDJELA: .char n
+LAB4: add al r5, r6
+
+.end
