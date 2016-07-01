@@ -21,7 +21,7 @@ int main()
 
 	int i;
 	for(i = 0; i < instCnt; i++)
-		printf("Instr %d\n", textSection[i]);
+		printf("Instr %x\n", textSection[i]);
 	printSymbolTable();
 	printSectionTable();
 }

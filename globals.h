@@ -32,7 +32,7 @@ extern int sectionIndex;
 extern type next;
 extern token** tokens;
 extern int tokensCnt;
-extern int* textSection;
+extern unsigned int* textSection;
 extern int instCnt;
 
 char* typeToString(type t);
