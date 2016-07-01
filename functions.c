@@ -56,8 +56,6 @@ char* typeToString(type t)
 		return "MNEMONIC2";
 	if(t ==     MNEMONIC3)
 		return "MNEMONIC3";
-	if(t ==     MNEMONIC4)
-		return "MNEMONIC4";
 	if(t == OTHER)
 		return "OTHER";
 
@@ -214,7 +212,7 @@ void firstPass()
 {
 	while(1)
 	{	
-		token* t = createEntry(next);
+		token* t = createEntry(ANY);
 
 		printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);		
 		if(t->tokenType == MNEMONIC)
@@ -228,21 +226,11 @@ void firstPass()
 				t = createEntry(OPERAND);
 				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 			}
-			else if(strcmp(op, "shr") == 0 || strcmp(op, "shl") == 0)
+			else if(strcmp(op, "shr") == 0 || strcmp(op, "shl") == 0 || strcmp(op, "shl_") == 0 || strcmp(op, "shr_") == 0 ||
+					strcmp(op, "ldrib") == 0 || strcmp(op, "ldria") == 0 || strcmp(op, "ldrdb") == 0 || strcmp(op, "ldrda") == 0 || 
+					strcmp(op, "strib") == 0 || strcmp(op, "stria") == 0 || strcmp(op, "strdb") == 0 || strcmp(op, "strda") == 0)
 			{
 				tokens[tokensCnt - 2]->tokenType = MNEMONIC3;
-				t = createEntry(OPERAND);
-				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
-				t = createEntry(OPERAND);
-				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
-				t = createEntry(OPERAND);
-				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
-			}
-			else if( strcmp(op, "ldr") == 0 || strcmp(op, "str") == 0)
-			{
-				tokens[tokensCnt - 2]->tokenType = MNEMONIC4;
-				t = createEntry(OPERAND);
-				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 				t = createEntry(OPERAND);
 				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 				t = createEntry(OPERAND);
@@ -258,6 +246,11 @@ void firstPass()
 				t = createEntry(OPERAND);
 				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 			}
+		}
+		if(t->tokenType == SECTION)
+		{
+			t = createEntry(EXPRESSION);
+			printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 		}
 
 		if(t->end == 1)
@@ -336,12 +329,14 @@ mnemonic isMnemonic(char* tok)
 	if(strcmp(tok, "add") == 0 || strcmp(tok, "cmp") == 0 || strcmp(tok, "sub") == 0 || strcmp(tok, "test") == 0 ||
 	   strcmp(tok, "mul") == 0 || strcmp(tok, "div") == 0 || strcmp(tok, "int") == 0 || strcmp(tok, "mov") == 0 || 
 	   strcmp(tok, "shr") == 0 || strcmp(tok, "shl") == 0 || strcmp(tok, "and") == 0 || strcmp(tok, "or") == 0 ||
-	   strcmp(tok, "not") == 0 || strcmp(tok, "ldr") == 0 || strcmp(tok, "str") == 0 || strcmp(tok, "in") == 0 || 
-	   strcmp(tok, "out") == 0 || strcmp(tok, "call") == 0 || strcmp(tok, "ldcl") == 0 || strcmp(tok, "ldch") == 0 || strcmp(tok, "ldc") == 0)
+	   strcmp(tok, "not") == 0 || strcmp(tok, "in") == 0 || strcmp(tok, "out") == 0 ||
+	   strcmp(tok, "ldrib") == 0 || strcmp(tok, "ldria") == 0 || strcmp(tok, "ldrdb") == 0 || strcmp(tok, "ldrda") == 0 ||
+	   strcmp(tok, "strib") == 0 || strcmp(tok, "stria") == 0 || strcmp(tok, "strdb") == 0 || strcmp(tok, "strda") == 0 ||
+	   strcmp(tok, "call") == 0 || strcmp(tok, "ldcl") == 0 || strcmp(tok, "ldch") == 0 || strcmp(tok, "ldc") == 0)
 			return UPDATE;
 	if(strcmp(tok, "add_") == 0 || strcmp(tok, "cmp_") == 0 || strcmp(tok, "sub_") == 0 || strcmp(tok, "test_") == 0 ||
 	   strcmp(tok, "mul_") == 0 || strcmp(tok, "div_") == 0 || strcmp(tok, "mov_") == 0 || strcmp(tok, "shr_") == 0 || 
-	   strcmp(tok, "shl_") == 0 || strcmp(tok, "and_") == 0 || strcmp(tok, "or_") == 0 || strcmp(tok, "not_") == 0)
+	   strcmp(tok, "shl_") == 0 || strcmp(tok, "and_") == 0 || strcmp(tok, "or_") == 0 || strcmp(tok, "not_") == 0 )
 			return NOUPDATE;
 	return NOTMNEMONIC;
 }
@@ -357,21 +352,34 @@ token* makeToken(type ty)
 	while(c == ' ' || c == '\n')
 		c = getc(file);
 
-	int charCount = 0;;
 	int dotCount = 0;
-	while(c != ',' && c != ':' && c != ' ' && c != '\n' && c!= EOF)
+	if(ty == EXPRESSION)
 	{
-		if(c == '.')
-			dotCount++;
-		if(tok == 0)
-			tok = (char *) malloc(sizeof(char) * 1);
-		else
-			tok = (char*) realloc(tok, sizeof(char) * (cnt + 1));
-		tok[cnt] = c;
-		cnt++;
-		c = getc(file);
-
-		charCount++;
+		while(c != '\n')
+		{
+			if(tok == 0)
+				tok = (char *) malloc(sizeof(char) * 1);
+			else
+				tok = (char*) realloc(tok, sizeof(char) * (cnt + 1));
+			tok[cnt] = c;
+			cnt++;
+			c = getc(file);
+		}
+	}
+	else 
+	{
+		while(c != ',' && c != ':' && c != ' ' && c != '\n' && c!= EOF)
+		{
+			if(c == '.')
+				dotCount++;
+			if(tok == 0)
+				tok = (char *) malloc(sizeof(char) * 1);
+			else
+				tok = (char*) realloc(tok, sizeof(char) * (cnt + 1));
+			tok[cnt] = c;
+			cnt++;
+			c = getc(file);
+		}
 	}
 	tok = (char*) realloc(tok, sizeof(char) * (cnt + 1));
 	tok[cnt] = '\0';
@@ -380,7 +388,11 @@ token* makeToken(type ty)
 
 	if (c == EOF)
 		t->end = 1;
-
+	if(ty == EXPRESSION)
+	{
+		t->tokenType = EXPRESSION;
+		return t;
+	}
 	if(strcmp(tok, ".end") == 0)
 	{
 		t->tokenType = END;
@@ -428,7 +440,7 @@ token* makeToken(type ty)
 	}
 	else if(isMnemonic(tok) == NOUPDATE)
 	{
-		t->tokenType == MNEMONIC;
+		t->tokenType = MNEMONIC;
 		t->flags = 0;
 	}
 	else	
@@ -505,7 +517,7 @@ int condToCode(condition c)
 
 unsigned int getOpCode(char* op)
 {
-	if(strcmp(op, "call") == 0)
+	if(strcmp(op, "int") == 0)
 		return 0;
 	if(strcmp(op, "add") == 0 || strcmp(op, "add_") == 0)
 		return 1;
@@ -525,6 +537,10 @@ unsigned int getOpCode(char* op)
 		return 8;
 	if(strcmp(op, "test") == 0 || strcmp(op, "test_") == 0)
 		return 9;
+	if(strcmp(op, "ldrib") == 0 || strcmp(op, "ldria") == 0 || strcmp(op, "ldrdb") == 0 || strcmp(op, "ldrda") == 0)
+		return 10;
+	if(strcmp(op, "strib") == 0 || strcmp(op, "stria") == 0 || strcmp(op, "strdb") == 0 || strcmp(op, "strda") == 0)
+		return 10;
 	if(strcmp(op, "call") == 0)
 		return 12;
 	if(strcmp(op, "in") == 0)
@@ -596,15 +612,15 @@ void secondPass()
 				else
 					cond = condToCode(AL);
 				oc |= cond;
-				oc << 1;
-				oc != update;
-				oc << 4;
+				oc <<= 1;
+				oc |= update;
+				oc <<= 4;
 				oc |= opCode;
-				oc << 4;
+				oc <<= 4;
 				unsigned int op1 = atoi(t->token);
+				oc <<= 20;
 				//provera dve greske, da nije immed i da je vece od 16
 				oc |= op1;
-				oc << 22;
 
 				//ne mora text, moze bilo koja sekcija koja sadrzi tekst, za pocetak nek bude samo txt
 				if(instCnt == 0)
@@ -649,12 +665,35 @@ void secondPass()
 
 				if(opCode == 15)
 				{
-					//ldch i ldcl - treba i za ldc!
-					oc <<= 1;
-					if(strcmp(op, "ldch") == 0)
+					if(strcmp(op, "ldc") == 0);
+					{
+						unsigned int oc2 = oc;
+						oc2 <<= 1;
+						oc2 |= 0x00000000;
+						oc2 <<= 19;
+						op2 = atoi(t->token);
+						oc2 |= op2;
+						if(instCnt == 0)
+							textSection = (int*) malloc(sizeof(int));
+						else
+						textSection = (int*) realloc(textSection, sizeof(int) * (instCnt + 1));
+
+						instCnt++;
+						textSection[instCnt - 1] = oc2;
+						oc <<= 1;
 						oc |= 0x00000001;
-					else
+					}
+					//ldch i ldcl - treba i za ldc!
+					if(strcmp(op, "ldch") == 0)
+					{
+						oc <<= 1;
+						oc |= 0x00000001;
+					}
+					else if (strcmp(op, "ldcl") == 0)
+					{
+						oc << 1;
 						oc |= 0x00000000;
+					}
 					oc <<= 19;
 					if(t->tokenType == IMMEDIATE)
 						op2 = atoi(t->token); //sad treba da ide else, pa provera za labelu, table arelokacija ...
@@ -669,9 +708,9 @@ void secondPass()
 						oc <<= 1;
 						oc |= 0x00000001;
 						oc <<= 18;
-						op2 = atoi(t->token);
-						oc |= op2;
 					}
+					op2 = atoi(t->token);
+					oc |= op2;
 				}
 				else
 				{
@@ -691,11 +730,12 @@ void secondPass()
 						oc <<= 13;
 					else if(opCode == 13)
 					{
+						oc <<= 1;
 						if(strcmp(op, "in") == 0)
 							oc |= 0x00000001;
 						else
 							oc |= 0x00000000;
-						oc <<= 16;
+						oc <<= 15;
 					}
 					else
 						oc <<= 14;
@@ -743,7 +783,73 @@ void secondPass()
 				oc |= op1;
 				oc <<= 5;
 				oc |= op2;
-				if(strcmp(op, "mov") == 0 || strcmp(op, "mov_") == 0)
+				unsigned int f;
+				if(strcmp(op, "ldrib") == 0 || strcmp(op, "strib") == 0)
+				{
+					if(op1 == PC || op2 == PC)
+						f = 0;
+					else
+						f = 4;
+					oc <<= 3;
+					oc |= f;
+					oc <<= 1;
+					if(strcmp(op, "ldrib") == 0)
+						oc |= 0x00000001;
+					else
+						oc |= 0x00000000;
+					oc <<= 10;
+					oc |= op3;
+
+				}
+				else if(strcmp(op, "ldria") == 0 || strcmp(op, "stria") == 0)
+				{
+					if(op1 == PC || op2 == PC)
+						f = 0;
+					else
+						f = 2;
+					oc <<= 3;
+					oc |= f;
+					oc <<= 1;
+					if(strcmp(op, "ldria") == 0)
+						oc |= 0x00000001;
+					else
+						oc |= 0x00000000;
+					oc <<= 10;
+					oc |= op3;
+				}
+				else if(strcmp(op, "ldrda") == 0 || strcmp(op, "strda") == 0)
+				{
+					if(op1 == PC || op2 == PC)
+						f = 0;
+					else
+						f = 3;
+					oc <<= 3;
+					oc |= f;
+					oc <<= 1;
+					if(strcmp(op, "ldrda") == 0)
+						oc |= 0x00000001;
+					else
+						oc |= 0x00000000;
+					oc <<= 10;
+					oc |= op3;
+				}
+				else if(strcmp(op, "ldrdb") == 0 || strcmp(op, "strdb") == 0)
+				{
+					if(op1 == PC || op2 == PC)
+						f = 0;
+					else
+						f = 5;
+					oc <<= 3;
+					oc |= f;
+					oc <<= 1;
+					if(strcmp(op, "ldrib") == 0)
+						oc |= 0x00000001;
+					else
+						oc |= 0x00000000;
+					oc <<= 10;
+					oc |= op3;
+				}
+				else if(strcmp(op, "mov") == 0 || strcmp(op, "mov_") == 0)
 				{
 					oc << 14;
 					oc |= 0x00000000;
@@ -767,61 +873,6 @@ void secondPass()
 
 				instCnt++;
 				textSection[instCnt - 1] = oc;
-			}
-			if(t->tokenType == MNEMONIC4)
-			{
-				unsigned int update = t->flags;
-				unsigned int opCode = getOpCode(t->token);
-				char* op = t->token;
-				t = tokens[cnt];
-				cnt++;
-				if(t->tokenType == CONDITION)
-				{
-					cond = condToCode(isCondition(t->token));
-					t = tokens[cnt];
-					cnt++;
-				}
-				else
-					cond = condToCode(AL);
-
-				oc |= cond;
-				oc <<= 1;
-				oc |= update;
-				oc <<= 4;
-				oc |= opCode;
-				oc <<= 5;
-				//provere za registre
-				int op1 = isRegister(t->token);
-				t = tokens[cnt];
-				cnt++;
-				int op2 = isRegister(t->token);
-				t = tokens[cnt];
-				cnt++;
-				int op3 = atoi(t->token);
-				t = tokens[cnt];
-				cnt++;
-				int op4 = atoi(t->token);
-				oc |= op1;
-				oc <<= 5;
-				oc |= op2;
-				oc <<= 3;
-				oc |= op3;
-				oc <<= 1;
-				if(strcmp(op, "ldr") == 0)
-					oc |= 0x00000001;
-				else
-					oc |= 0x00000000;
-				oc <<= 10;
-				oc |= op4;
-
-				if(instCnt == 0)
-					textSection = (int*) malloc(sizeof(int));
-				else
-					textSection = (int*) realloc(textSection, sizeof(int) * (instCnt + 1));
-
-				instCnt++;
-				textSection[instCnt - 1] = oc;
-
 			}
 	//labele se ignorisu
 	//others - char, word, long - posle, align i skip ??
