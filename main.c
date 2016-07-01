@@ -17,6 +17,11 @@ int main()
 
 	fseek(file, 0, SEEK_SET);
 
+	secondPass();
+
+	int i;
+	for(i = 0; i < instCnt; i++)
+		printf("Instr %d\n", textSection[i]);
 	printSymbolTable();
 	printSectionTable();
 }

@@ -4,13 +4,15 @@
 
 #define SIZE 100
 
-typedef enum {ANY, MNEMONIC, MNEMONIC1, MNEMONIC2, MNEMONIC3, LABEL, OPERAND, IMMEDIATE, DIRECTIVE, OTHER, SECTION, SUBSECTION, ENDOFFILE, SYMBOL, CONDITION, END, ERROR} type;
+typedef enum {ANY, MNEMONIC, MNEMONIC1, MNEMONIC2, MNEMONIC3, MNEMONIC4, LABEL, OPERAND, IMMEDIATE, DIRECTIVE, OTHER, SECTION, SUBSECTION, ENDOFFILE, SYMBOL, CONDITION, END, ERROR} type;
 typedef enum {NO, AL, EQ, NE, GT, GE, LT, LE} condition;
-typedef enum {R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, PC, LR, SR, PSW, NONE} registers;
+typedef enum {R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, PC, LR, SP, PSW, NONE} reg;
+typedef enum {NOTMNEMONIC, UPDATE, NOUPDATE} mnemonic;
 typedef struct Token {
 	char* token;
 	type tokenType;
 	int end;
+	int flags;
 } token;
 
 
@@ -30,6 +32,8 @@ extern int sectionIndex;
 extern type next;
 extern token** tokens;
 extern int tokensCnt;
+extern int* textSection;
+extern int instCnt;
 
 char* typeToString(type t);
 
@@ -43,3 +47,4 @@ void printSectionTable();
 token* makeToken(type ty);
 token* createEntry(type t);
 void firstPass();
+void secondPass();
