@@ -35,16 +35,16 @@ extern int tokensCnt;
 extern unsigned int* textSection;
 extern int instCnt;
 
-char* typeToString(type t);
-
-int makeSectionTableEntry(token* t, int index);
-int makeSymbolTableEntry(token* t);
-int makeStringTableEntry(token* t);
-
 void printSymbolTable();
 void printSectionTable();
 
-token* makeToken(type ty);
-token* createEntry(type t);
 void firstPass();
 void secondPass();
+
+//decodeFunctions.c
+unsigned int getOpCode(char* op);
+int condToCode(condition c);
+reg isRegister(char* op);
+mnemonic isMnemonic(char* tok);
+condition isCondition(char* cond);
+char* typeToString(type t);
