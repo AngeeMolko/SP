@@ -193,8 +193,3 @@ char* typeToString(type t)
 		return "OTHER";
 
 }
-
-unsigned int toLittleEndian(unsigned int data)
-{
-	return data;
-}

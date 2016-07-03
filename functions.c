@@ -102,7 +102,7 @@ void secondPass()
 		//direktive, simboli			
 			unsigned int oc = 0;
 			int cond;
-			if(t->tokenType == SECTION)
+			if(t->tokenType == SECTION || t->tokenType == SUBSECTION)
 			{
 				int i;
 				for(i = 0; i < sectionTableSize; ++i)
@@ -138,13 +138,23 @@ void secondPass()
 				oc <<= 20;
 
 				//ne mora text, moze bilo koja sekcija koja sadrzi tekst, za pocetak nek bude samo txt
-				if(instCnt == 0)
-					textSection = (int*) malloc(sizeof(int));
+				if(byteCnt == 0)
+					sectionContent[currSection] = (char*) malloc(sizeof(char) * 4);
 				else
-					textSection = (int*) realloc(textSection, sizeof(int) * (instCnt + 1));
-				instCnt++;
+					sectionContent[currSection] = (char*) realloc(sectionContent[currSection], sizeof(char) * (byteCnt + 4));
 
-				textSection[instCnt - 1] = oc;
+				unsigned int tmp = oc;
+				char input = oc & 0xff;
+				sectionContent[currSection][byteCnt] = input;
+				oc >>= 8;
+				input = oc & 0xff;
+				sectionContent[currSection][byteCnt + 1] = input;
+				oc >>= 8;
+				input = oc & 0xff; 
+				sectionContent[currSection][byteCnt + 2] = input;
+				oc >>= 8;
+				input = oc & 0xff;
+				sectionContent[currSection][byteCnt + 3] = input;
 				byteCnt += 4;
 			}
 			if(t->tokenType == MNEMONIC2)
@@ -181,21 +191,41 @@ void secondPass()
 
 				if(opCode == 15)
 				{
-					if(strcmp(op, "ldc") == 0);
+					if(strcmp(op, "ldc") == 0)
 					{
 						unsigned int oc2 = oc;
 						oc2 <<= 1;
 						oc2 |= 0x00000000;
 						oc2 <<= 19;
-						op2 = atoi(t->token);
-						oc2 |= op2;
-						if(instCnt == 0)
-							textSection = (int*) malloc(sizeof(int));
-						else
-						textSection = (int*) realloc(textSection, sizeof(int) * (instCnt + 1));
-
-						instCnt++;
-						textSection[instCnt - 1] = oc2;
+						if(t->tokenType == IMMEDIATE)
+						{
+							op2 = atoi(t->token);
+							oc2 |= op2;
+						}
+						else if(isRegister(t->token) == NONE)
+						{
+							unsigned int op2 = processSymbol(t->token, 'A', byteCnt + 2, 0, 16);
+							op2 &= 0x0000ffff;
+							oc |= op2;
+						}
+						if(byteCnt == 0)
+						sectionContent[currSection] = (char*) malloc(sizeof(char) * 4);
+							else
+						sectionContent[currSection] = (char*) realloc(sectionContent[currSection], sizeof(char) * (byteCnt + 4));
+				
+						unsigned int tmp = oc2;
+						char input = oc & 0xff;
+						sectionContent[currSection][byteCnt] = input;
+						oc2 >>= 8;
+						input = oc2 & 0xff;
+						sectionContent[currSection][byteCnt + 1] = input;
+						oc2 >>= 8;
+						input = oc2 & 0xff; 
+						sectionContent[currSection][byteCnt + 2] = input;
+						oc2 >>= 8;
+						input = oc2 & 0xff;
+						sectionContent[currSection][byteCnt + 3] = input;
+						byteCnt += 4;
 						oc <<= 1;
 						oc |= 0x00000001;
 					}
@@ -212,8 +242,13 @@ void secondPass()
 					}
 					oc <<= 19;
 					if(t->tokenType == IMMEDIATE)
-						op2 = atoi(t->token); //sad treba da ide else, pa provera za labelu, table arelokacija ...
-					oc |= op2;
+						op2 = atoi(t->token);
+					else if(isRegister(t->token) == NONE)
+					{
+						unsigned int op2 = processSymbol(t->token, 'A', byteCnt + 2, 0, 16);
+						op2 &= 0x0000ffff;
+					} //sad treba da ide else, pa provera za labelu, table arelokacija ...
+						oc |= op2;
 				}
 				else if(t->tokenType == IMMEDIATE)
 				{
@@ -230,7 +265,7 @@ void secondPass()
 				}
 				else if(isRegister(t->token) == NONE)
 				{
-					unsigned int op2 = processSymbol(t->token, 'R', byteCnt + 1, 5, 19);
+					unsigned int op2 = processSymbol(t->token, 'A', byteCnt + 1, 5, 19);
 					op2 &= 0x0007ffff;
 					oc <<= 19;
 					oc |= op2;
@@ -264,14 +299,25 @@ void secondPass()
 						oc <<= 14;
 				}
 				//kod ldcl, ldch c moze da bude i labela, ne samo immed, kako to uraditii
-				if(instCnt == 0)
-						textSection = (int*) malloc(sizeof(int));
+				if(byteCnt == 0)
+					sectionContent[currSection] = (char*) malloc(sizeof(char) * 4);
 				else
-					textSection = (int*) realloc(textSection, sizeof(int) * (instCnt + 1));
-				instCnt++;
+					sectionContent[currSection] = (char*) realloc(sectionContent[currSection], sizeof(char) * (byteCnt + 4));
 
-				textSection[instCnt - 1] = oc;
+				unsigned int tmp = oc;
+				char input = oc & 0xff;
+				sectionContent[currSection][byteCnt] = input;
+				oc >>= 8;
+				input = oc & 0xff;
+				sectionContent[currSection][byteCnt + 1] = input;
+				oc >>= 8;
+				input = oc & 0xff; 
+				sectionContent[currSection][byteCnt + 2] = input;
+				oc >>= 8;
+				input = oc & 0xff;
+				sectionContent[currSection][byteCnt+ 3] = input;
 				byteCnt += 4;
+
 			}
 			if(t->tokenType == MNEMONIC3)
 			{
@@ -303,7 +349,14 @@ void secondPass()
 				int op2 = isRegister(t->token);
 				t = tokens[cnt];
 				cnt++;
-				int op3 = atoi(t->token);
+				int op3;
+				if(t->tokenType == IMMEDIATE)
+					 op3 = atoi(t->token);
+				else if(isRegister(t->token) == NONE)
+				{
+					op3 = processSymbol(t->token, 'A', byteCnt + 2, 6, 10);
+					op3 &= 0x0000003f;
+				}
 				oc |= op1;
 				oc <<= 5;
 				oc |= op2;
@@ -390,38 +443,128 @@ void secondPass()
 					oc <<= 8;
 				}
 
-				if(instCnt == 0)
-					textSection = (int*) malloc(sizeof(int));
+				if(byteCnt == 0)
+					sectionContent[currSection] = (char*) malloc(sizeof(char) * 4);
 				else
-					textSection = (int*) realloc(textSection, sizeof(int) * (instCnt + 1));
-
-				instCnt++;
-				textSection[instCnt - 1] = oc;
+					sectionContent[currSection] = (char*) realloc(sectionContent[currSection], sizeof(char) * (byteCnt + 4));
+				
+				unsigned int tmp = oc;
+				char input = oc & 0xff;
+				sectionContent[currSection][byteCnt] = input;
+				oc >>= 8;
+				input = oc & 0xff;
+				sectionContent[currSection][byteCnt + 1] = input;
+				oc >>= 8;
+				input = oc & 0xff; 
+				sectionContent[currSection][byteCnt + 2] = input;
+				oc >>= 8;
+				input = oc & 0xff;
+				sectionContent[currSection][byteCnt + 3] = input;
 				byteCnt += 4;
 			}
 			if(prevToken != 0)
 			{
 				if(strcmp(prevToken->token, ".char") == 0)
+				{
+					if(byteCnt == 0)
+						sectionContent[currSection] = (char*) malloc(sizeof(char) * 4);
+					else
+						sectionContent[currSection] = (char*) realloc(sectionContent[currSection], sizeof(char) * (byteCnt + 1)) ;
+
+					unsigned int op;
+					if(t->tokenType == IMMEDIATE)
+					{
+						op = atoi(t->token);
+						sectionContent[currSection][byteCnt] = op;
+					}
+					else if(isRegister(t->token) == NONE)
+					{
+						op = processSymbol(t->token, 'A', byteCnt, 0, 1);
+						op &= 0xff;
+						sectionContent[currSection][byteCnt] = op;
+					}
+					// je l treba else i za registre?
+					// char
 					byteCnt += 1;
+				}
 				if(strcmp(prevToken->token, ".word") == 0)
+				{
+					if(byteCnt == 0)
+						sectionContent[currSection] = (char*) malloc(sizeof(char) * 4);
+					else
+						sectionContent[currSection] = (char*) realloc(sectionContent[currSection], sizeof(char) * (byteCnt + 2)) ;
+
+					unsigned int op;
+					if(t->tokenType == IMMEDIATE)
+					{
+						op = atoi(t->token);
+						sectionContent[currSection][byteCnt] = op & 0x0000ff00;
+						sectionContent[currSection][byteCnt + 1] = op & 0x000000ff;
+					}
+					else if(isRegister(t->token) == NONE)
+					{
+						op = processSymbol(t->token, 'A', byteCnt, 0, 1);
+						sectionContent[currSection][byteCnt] = op & 0x0000ff00;
+						sectionContent[currSection][byteCnt + 1] = op & 0x000000ff;
+					}
 					byteCnt += 2;
+				}
 				if(strcmp(prevToken->token, ".long") == 0)
+				{
+					if(byteCnt == 0)
+						sectionContent[currSection] = (char*) malloc(sizeof(char) * 4);
+					else
+						sectionContent[currSection] = (char*) realloc(sectionContent[currSection], sizeof(char) * (byteCnt + 4)) ;
+
+					unsigned int op;
+					if(t->tokenType == IMMEDIATE)
+					{
+						op = atoi(t->token);
+						sectionContent[currSection][byteCnt] = op & 0x000000ff;
+						sectionContent[currSection][byteCnt + 1] = op & 0x0000ff00;
+						sectionContent[currSection][byteCnt + 2] = op & 0x00ff0000;
+						sectionContent[currSection][byteCnt + 3] = op & 0xff000000;
+					}
+					else if(isRegister(t->token) == NONE)
+					{
+						op = processSymbol(t->token, 'A', byteCnt, 0, 1);
+						sectionContent[currSection][byteCnt] = op & 0x000000ff;
+						sectionContent[currSection][byteCnt + 1] = op & 0x0000ff00;
+						sectionContent[currSection][byteCnt + 2] = op & 0x00ff0000;
+						sectionContent[currSection][byteCnt + 3] = op & 0xff000000;
+					}
 					byteCnt += 4;
+				}
 				if(strcmp(prevToken->token, ".skip") == 0)
-					byteCnt += atoi(t->token);
+				{
+					int i;
+					int cnt = atoi(t->token);
+
+					if(byteCnt == 0)
+						sectionContent[currSection] = (char*) malloc(sizeof(char) * 4);
+					else
+						sectionContent[currSection] = (char*) realloc(sectionContent[currSection], sizeof(char) * (byteCnt + cnt));
+
+					for(i = 0; i < cnt; i++)
+						sectionContent[currSection][byteCnt + i] = 0x00;
+					byteCnt += cnt;
+				}
 				if(strcmp(prevToken->token, ".align") == 0)
 				{
 					int imm = atoi(t->token);
 					int pad = imm - byteCnt % imm;
+
+					if(byteCnt == 0)
+						sectionContent[currSection] = (char*) malloc(sizeof(char) * 4);
+					else
+						sectionContent[currSection] = (char*) realloc(sectionContent[currSection], sizeof(char) * (byteCnt + pad));
+					int i;
+					for(i = 0; i < pad; i++)
+						sectionContent[currSection][byteCnt + i] = 0x00;
+
 					byteCnt += pad;
 				}
 			}
-	//labele se ignorisu
-	//others - char, word, long - posle, align i skip ??
-	//mnemonici i operandi
-
-
-		//izmenitiiii
 
 	if(t->tokenType != SYMBOL && t->tokenType != OPERAND && t->tokenType != CONDITION)
 		prevToken = t;

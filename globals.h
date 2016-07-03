@@ -36,6 +36,13 @@ typedef struct Symbol
 	unsigned int st_size;
 } symbol;
 
+typedef struct Section
+{
+	unsigned int sh_size;
+	unsigned int sh_name;
+	char* content;
+} section;
+
 
 extern FILE* file;
 extern char* stringTable;
@@ -45,7 +52,7 @@ extern token* prevToken;
 extern int currSection;
 extern symbol* symbolTable;
 extern int symbolTableSize;
-extern Elf32_Shdr* sectionTable;
+extern section* sectionTable;
 extern int sectionTableSize;
 extern int sectionIndex;
 extern int typeCnt;
@@ -57,7 +64,7 @@ extern unsigned int* textSection;
 extern int instCnt;
 extern unsigned int* dataSection;
 extern int dataCount;
-extern unsigned int** sectionContent;
+extern char** sectionContent;
 extern int* sectionContentCnt;
 extern rel** relocationTable;
 extern int* relocationTableSize;

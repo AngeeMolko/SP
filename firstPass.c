@@ -12,7 +12,7 @@ token* prevToken = 0;
 int currSection = 0;
 symbol* symbolTable = 0;
 int symbolTableSize = 0;
-Elf32_Shdr* sectionTable = 0;
+section* sectionTable = 0;
 int sectionTableSize = 0;
 int sectionIndex;
 int typeCnt = 12;
@@ -25,7 +25,7 @@ unsigned int* textSection = 0;
 int instCnt = 0;
 unsigned int* dataSection = 0;
 int dataCount = 0;
-unsigned int** sectionContent = 0;
+char** sectionContent = 0;
 int* sectionContentCnt = 0;
 rel** relocationTable = 0;
 int* relocationTableSize = 0;
@@ -42,34 +42,16 @@ int makeSectionTableEntry(token* t, int stringIndex)
 	printf("Alociranje sekcije!\n");
 	if(sectionTableSize == 0)
 	{
-		sectionTable = (Elf32_Shdr*) malloc(sizeof(Elf32_Shdr));
+		sectionTable = (section*) malloc(sizeof(section));
 		sectionTableSize++;
 	}
-	sectionTable = (Elf32_Shdr*) realloc(sectionTable, sizeof(Elf32_Shdr)*(sectionTableSize + 1));
+	sectionTable = (section*) realloc(sectionTable, sizeof(section)*(sectionTableSize + 1));
 
-	Elf32_Shdr sec;
-	char* name = t->token;
+	section sec;
 
 	sec.sh_name = stringIndex; //the rest will be done in makeStringTableEntry
-
-	type myType = t->tokenType;
-
-	if(myType == SECTION)
-	{
-		sectionIndex = sectionTableSize; // start of a new section
-
-		if(strcmp(name, ".data") == 0 || strcmp(name, ".text") == 0)
-			sec.sh_type = SHT_PROGBITS; // there is an existing type for .data and .txt
-		else if(strcmp(name, ".bss") == 0)
-			sec.sh_type = SHT_NOBITS; // there is an existing type for .bss
-		else
-		{
-			sec.sh_type = typeCnt; // make new type
-			typeCnt++; 
-		}
-	}
-	else // myType == SUBSECTION
-		sec.sh_type = sectionTable[sectionIndex].sh_type; // subsections are the same type as the section they belong to
+	sec.sh_size = 0;
+	sec.content = 0;
 
 	//enter new entry into the section table
 	sectionTable[sectionTableSize] = sec;
@@ -210,7 +192,7 @@ void printSectionTable()
 		index = sectionTable[i].sh_name;
 
 		printf("Section name: %s\n", &stringTable[index]);
-		printf("Section value: %d\n", sectionTable[i].sh_type);
+		//printf("Section value: %d\n", sectionTable[i].sh_type);
 	}
 }
 
@@ -286,13 +268,13 @@ token* createEntry(type t)
 	token* tok = makeToken(t);
 	type myType = tok->tokenType;
 	if(myType == END)
+	{
+		sectionTable[sectionTableSize - 1].sh_size = sectionCnt;
 		return tok;
+	}
 
 	if(myType == SECTION || myType == SUBSECTION || myType == LABEL) // new symbol table entry needed
 	{
-		if(myType == SECTION || myType == SUBSECTION)
-			sectionCnt = 0;
-
 		int i;
 		int symbolIndex;
 		int is_public = 0;
@@ -324,9 +306,13 @@ token* createEntry(type t)
 		{
 			symbolIndex = makeSymbolTableEntry(tok);
 			sectionIndex = makeSectionTableEntry(tok, symbolTable[symbolIndex].st_name);
+			if(sectionTableSize > 1)
+			{
+				sectionTable[sectionTableSize - 1].sh_size = sectionCnt;
+				sectionCnt = 0;
+			}
 			symbolTable[symbolTableSize - 1].sectionIndex = sectionIndex;
 			currSection = sectionIndex;
-			symbolTable[symbolIndex].sectionIndex = sectionIndex;
 		}
 
 		//printSymbolTable();
