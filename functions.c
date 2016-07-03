@@ -5,10 +5,94 @@
 #include "globals.h"
 
 int cnt;
+int byteCnt;
+
+unsigned int processSymbol(char* sym, char r, int byteOffset, int bitOffset, int size)
+{
+	int i;
+	int symbolSection = 0;
+	int symbolIndex = 0;
+
+	for(i = 0; i < symbolTableSize; i++)
+	{
+		if(strcmp(sym, &stringTable[symbolTable[i].st_name]) == 0)// && i == symbolTable[i].sectionIndex)
+		{
+			symbolIndex = i;
+			symbolSection = symbolTable[symbolIndex].sectionIndex;
+		}
+	}
+
+	if(r == 'R' && currSection == symbolSection && symbolTable[symbolIndex].is_extern != 1)
+		return symbolTable[symbolIndex].st_value;
+
+	rel relTableEntry;
+	relTableEntry.byteOffset = byteCnt + byteOffset;
+	relTableEntry.bitOffset = bitOffset;
+	relTableEntry.size = size;
+
+	if(r == 'R')
+		relTableEntry.rType = R;
+	else
+		relTableEntry.rType = A;
+
+	if(symbolTable[symbolIndex].is_global == 1)
+		relTableEntry.symbol = symbolIndex;
+	else
+		relTableEntry.symbol = symbolSection;
+
+	if(relocationTable == 0)
+	{
+		int i;
+		relocationTable = (rel**) malloc(sizeof(rel*) * sectionTableSize);
+		relocationTableSize = (int*) malloc(sizeof(int) * sectionTableSize);
+		memset(relocationTableSize, 0, sizeof(int) * sectionTableSize);
+	}
+	if(relocationTableSize[symbolSection] == 0)
+		relocationTable[symbolSection] = (rel*) malloc(sizeof(rel));
+	else
+		relocationTable[symbolSection] = (rel*) realloc(relocationTable[symbolSection], sizeof(rel) * (relocationTableSize[symbolSection] + 1));
+	//printf("Upisujem u: %d %d\n", symbolSection, relocationTableSize[symbolSection]);
+	relocationTable[symbolSection][relocationTableSize[symbolSection]] = relTableEntry;
+	relocationTableSize[symbolSection]++;
+
+	if(r == 'A')
+	{
+		if( symbolTable[symbolIndex].is_global == 1) //global 
+			return 0x00000000;	
+		else
+		{
+			unsigned int ret = 0x00000000;
+			ret |= symbolTable[symbolIndex].st_value;
+
+			return ret;
+		}
+	}
+	else //r == 'R'
+	{
+		if( symbolTable[symbolIndex].is_global == 1) //global
+		{
+			unsigned int back = ((byteCnt + 4) - byteOffset);
+			unsigned int ret = 0;
+			ret -= back;
+			return ret;
+		}
+		else //local
+		{
+			unsigned int back = ((byteCnt + 4) - byteOffset);
+			unsigned int ret = 0;
+			ret -= back;
+			ret += symbolTable[symbolIndex].st_value;
+			return ret;
+		}
+
+	}
+
+}
+
 void secondPass()
 {
 	cnt = 0;
-	int byteCnt = 0;
+	byteCnt = 0;
 	while(cnt < tokensCnt)
 	{	
 		token* t = tokens[cnt];
@@ -23,10 +107,9 @@ void secondPass()
 				int i;
 				for(i = 0; i < sectionTableSize; ++i)
 				{
-					if(strcmp(t->token, &stringTable[sectionTable[i].st_name]) == 0)
+					if(strcmp(t->token, &stringTable[sectionTable[i].sh_name]) == 0)
 						currSection = i;
 				}
-				currSection = t->token;
 				byteCnt = 0;
 			}
 			if(t->tokenType == MNEMONIC1)
@@ -50,9 +133,9 @@ void secondPass()
 				oc |= opCode;
 				oc <<= 4;
 				unsigned int op1 = atoi(t->token);
-				oc <<= 20;
 				//provera dve greske, da nije immed i da je vece od 16
 				oc |= op1;
+				oc <<= 20;
 
 				//ne mora text, moze bilo koja sekcija koja sadrzi tekst, za pocetak nek bude samo txt
 				if(instCnt == 0)
@@ -143,6 +226,13 @@ void secondPass()
 						oc <<= 18;
 					}
 					op2 = atoi(t->token);
+					oc |= op2;
+				}
+				else if(isRegister(t->token) == NONE)
+				{
+					unsigned int op2 = processSymbol(t->token, 'R', byteCnt + 1, 5, 19);
+					op2 &= 0x0007ffff;
+					oc <<= 19;
 					oc |= op2;
 				}
 				else
@@ -318,10 +408,10 @@ void secondPass()
 				if(strcmp(prevToken->token, ".long") == 0)
 					byteCnt += 4;
 				if(strcmp(prevToken->token, ".skip") == 0)
-					byteCnt += atoi(tok->token);
+					byteCnt += atoi(t->token);
 				if(strcmp(prevToken->token, ".align") == 0)
 				{
-					int imm = atoi(tok->token);
+					int imm = atoi(t->token);
 					int pad = imm - byteCnt % imm;
 					byteCnt += pad;
 				}
@@ -387,86 +477,4 @@ long parseExpression(char* ex)
 			cnt++;
 
 	}
-}
-
-long processSymbol(char* sym, char r, int offset)
-{
-	int i;
-	int currSectionIndex = 0;
-	int symbolIndex = 0;
-
-	for(i = 1; i < symbolTableSize; i++)
-	{
-		if(strcmp(sym, &stringTable[symbolTable[i].sh_name]) == 0)
-		{
-			symbolIndex = i;
-			currSectionIndex = symbolTable[symbolIndex].st_shndx
-		}
-	}
-
-	if(r == 'R' && currSection == symbolTable[symbolIndex].st_shndx)
-		return symbolTable[symbolIndex].st_value;
-
-	Elf32_Rel rel;
-	rel.r_offset = byteCnt + offset;
-	rel.r_info = 0;
-
-	if(r == 'R')
-		r_info |= 0x02000000;
-	else
-		r_info |= 0x01000000;
-	r_info != symbolIndex;
-
-	if(strcmp((tokens[cnt - 1]->token, ".char") == 0 || strcmp(tokens[cnt - 1]->token, ".word") == 0 || strcmp(tokens[cnt - 1]->token, ".long") == 0)
-	{
-		if( (symbolTable[symbolIndex].st_info && 0x01) != 0) //global
-		{
-			if(dataCount == 0)
-				dataSection = (unsigned int*) malloc(sizeof(unsigned int));
-			else
-				dataSection = (unsigned int*) realloc(dataSection, sizeof(unsigned int) * (dataCount + 1));
-
-			dataCount[dataCount] = 0x00;
-			dataCount++;
-
-			return dataSection[dataCount];
-		}	
-		else//local
-		{
-			if(dataCount == 0)
-				dataSection = (unsigned int*) malloc(sizeof(unsigned int));
-			else
-				dataSection = (unsigned int*) realloc(dataSection, sizeof(unsigned int) * (dataCount + 1));
-
-			dataSection[dataCount] = symbolTable[symbolIndex].st_value;
-			dataCount++;
-
-			return dataSection[dataCount];
-
-		}
-	}
-	else //nailazak na simbol u insrukciji
-	{
-		int global = ((symbolTable[symbolIndex].st_info && 0x01) != 0 ) ? 1 : 0;
-		if(r == 'R')
-		{
-			if(global == 1)
-			{
-				return 0xfcffffff;
-			}
-		}
-		else
-		{
-			if(global == 1)
-			{
-
-			}
-			else
-			{
-
-			}
-		}
-
-	}
-
 }

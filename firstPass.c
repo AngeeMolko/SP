@@ -9,8 +9,8 @@ char* stringTable;
 int strtSize = 0;
 int sectionCnt = 0;
 token* prevToken = 0;
-char* currSection;
-Elf32_Sym* symbolTable = 0;
+int currSection = 0;
+symbol* symbolTable = 0;
 int symbolTableSize = 0;
 Elf32_Shdr* sectionTable = 0;
 int sectionTableSize = 0;
@@ -23,6 +23,12 @@ int tokensCnt = 0;
 int opCnt = 0;
 unsigned int* textSection = 0;
 int instCnt = 0;
+unsigned int* dataSection = 0;
+int dataCount = 0;
+unsigned int** sectionContent = 0;
+int* sectionContentCnt = 0;
+rel** relocationTable = 0;
+int* relocationTableSize = 0;
 
 int makeSectionTableEntry(token* t, int stringIndex);
 int makeSymbolTableEntry(token* t);
@@ -75,27 +81,78 @@ int makeSectionTableEntry(token* t, int stringIndex)
 
 int makeSymbolTableEntry(token* t)
 {
-	Elf32_Sym myEntry;
+	symbol myEntry;
 
 	int index = makeStringTableEntry(t);
+	printf("Napravio string! %d \n", sectionTableSize);
 	myEntry.st_name = index;
-	myEntry.st_value = sectionCnt;
-	myEntry.st_other = 0x00; // ??
-	myEntry.st_size = 0x00; // ??
+	if(prevToken != 0)
+	{
+		if((strcmp(prevToken->token, ".public") == 0 || strcmp(prevToken->token, ".extern") == 0) && t->tokenType == SYMBOL)
+		{
+			myEntry.is_global = 1;
+			myEntry.st_value = 0;
+			myEntry.sectionIndex = 0;
+		}
+		else
+		{
+			myEntry.is_global = 0;
+			myEntry.st_value = sectionCnt;
+			myEntry.sectionIndex = currSection;
+		}
+	}
+	if((t->tokenType == SECTION || t->tokenType == SUBSECTION) && sectionTableSize != 0)
+	{
+		int i;
+		for(int i = 0; i < symbolTableSize; ++i)
+		{
+			if(symbolTable[i].sectionIndex == (sectionTableSize - 1))
+			{
+				symbolTable[i].st_size = sectionTableSize;
+				break;
+			}
+		}
+	}
+	else
+	{
+			myEntry.is_global = 0;
+			myEntry.st_value = sectionCnt;
+			myEntry.sectionIndex = currSection;
+	}
+	if(prevToken != 0)
+	{
+		if(strcmp(prevToken->token, ".char") == 0)
+			myEntry.st_size = 0x01;
+		if(strcmp(prevToken->token, ".word") == 0)
+			myEntry.st_size = 0x02;
+		if(strcmp(prevToken->token, ".long") == 0)
+			myEntry.st_size = 0x04;
+		else
+			myEntry.st_size = 0x00;
+	}
+	else
+		myEntry.st_size = 0x00;
+	if(prevToken != 0)
+	{
+		if(strcmp(prevToken->token, ".extern") == 0)
+			myEntry.is_extern = 1;
+	}
+	else
+		myEntry.is_extern = 0;
 
 	type myType = t->tokenType;
 
-	if(myType == LABEL)
-		myEntry.st_info = 0x00; /// ? nznm
 	if(myType == SECTION || myType == SUBSECTION)
 	{
 		next = ANY;
-		myEntry.st_info = 0x03;
+		myEntry.is_section = 1;
 	}
+	else
+		myEntry.is_section = 0;
 
 
 	printf("Alociranje simbola!\n");
-	symbolTable = (Elf32_Sym*) realloc(symbolTable, sizeof(Elf32_Sym)*(symbolTableSize + 1));
+	symbolTable = (symbol*) realloc(symbolTable, sizeof(symbol)*(symbolTableSize + 1));
 
 	symbolTable[symbolTableSize] = myEntry;
 	symbolTableSize++;
@@ -138,9 +195,9 @@ void printSymbolTable()
 		printf("Symbol name: %s\n", &stringTable[index]);
 		printf("Symbol value: %d\n", symbolTable[i].st_value);
 		printf("Symbol size: %d\n", symbolTable[i].st_size);
-		printf("Symbol info: %d\n", symbolTable[i].st_info);
-		printf("Symbol other: %d\n", symbolTable[i].st_other);
-		printf("Symbol shndx: %d\n", symbolTable[i].st_shndx);
+		printf("Symbol shndx: %d\n", symbolTable[i].sectionIndex);
+		printf("Is global: %d\n", symbolTable[i].is_global);
+		printf("Is section: %d\n", symbolTable[i].is_section);
 	}
 }
 
@@ -159,28 +216,37 @@ void printSectionTable()
 
 void firstPass()
 {
+	token* t = createEntry(ANY);
 	while(1)
 	{	
-		token* t = createEntry(ANY);
-
 		printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);		
 		if(t->tokenType == MNEMONIC)
 		{
 			char* op = t->token;
-			t = createEntry(CONDITION);
-			printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 			if(strcmp(op, "int") == 0)
 			{
-				tokens[tokensCnt - 2]->tokenType = MNEMONIC1;
+				t->tokenType = MNEMONIC1;
+				prevToken = t;
 				t = createEntry(OPERAND);
+				if(t->tokenType == CONDITION)
+				{
+					printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
+					t = createEntry(OPERAND);
+				}
 				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 			}
 			else if(strcmp(op, "shr") == 0 || strcmp(op, "shl") == 0 || strcmp(op, "shl_") == 0 || strcmp(op, "shr_") == 0 ||
 					strcmp(op, "ldrib") == 0 || strcmp(op, "ldria") == 0 || strcmp(op, "ldrdb") == 0 || strcmp(op, "ldrda") == 0 || 
 					strcmp(op, "strib") == 0 || strcmp(op, "stria") == 0 || strcmp(op, "strdb") == 0 || strcmp(op, "strda") == 0)
 			{
-				tokens[tokensCnt - 2]->tokenType = MNEMONIC3;
+				t->tokenType = MNEMONIC3;
+				prevToken = t;
 				t = createEntry(OPERAND);
+				if(t->tokenType == CONDITION)
+				{
+					printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
+					t = createEntry(OPERAND);
+				}
 				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 				t = createEntry(OPERAND);
 				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
@@ -189,24 +255,28 @@ void firstPass()
 			}
 			else
 			{
-				tokens[tokensCnt - 2]->tokenType = MNEMONIC2;
+				t->tokenType = MNEMONIC2;
+				prevToken = t;
 				t = createEntry(OPERAND);
+				if(t->tokenType == CONDITION)
+				{
+					printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
+					t = createEntry(OPERAND);
+				}
 				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 				t = createEntry(OPERAND);
 				printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
 			}
 		}
-		if(t->tokenType == SECTION)
-		{
-			t = createEntry(EXPRESSION);
-			printf("Ja sam %s: %s \n", typeToString(t->tokenType), t->token);
-		}
-
-		if(t->tokenType != SYMBOL) /////////////////mozda je ovde greska
+		else if(t->tokenType != SYMBOL) /////////////////mozda je ovde greska
 			prevToken = t;
 
 		if(t->end == 1)
 			break;
+
+		t = createEntry(ANY);
+
+
 	}
 	prevToken = 0;
 }
@@ -215,29 +285,83 @@ token* createEntry(type t)
 {
 	token* tok = makeToken(t);
 	type myType = tok->tokenType;
+	if(myType == END)
+		return tok;
 
 	if(myType == SECTION || myType == SUBSECTION || myType == LABEL) // new symbol table entry needed
 	{
 		if(myType == SECTION || myType == SUBSECTION)
-		{
-			currSection = tok->token;
 			sectionCnt = 0;
-		}
-		int symbolIndex = makeSymbolTableEntry(tok);
-		if(myType == SECTION || myType == SUBSECTION)
+
+		int i;
+		int symbolIndex;
+		int is_public = 0;
+		if(myType == LABEL)
+		{
+			for(i = 0; i < symbolTableSize; ++i)
+			{
+				if(strcmp(tok->token, &stringTable[symbolTable[i].st_name]) == 0)
+				{	
+					symbolIndex = i;
+					is_public = 1;
+				}
+			}
+			if(is_public == 1)
+			{
+				symbolTable[symbolIndex].st_value = sectionCnt;
+				symbolTable[symbolIndex].is_global = 1;
+				symbolTable[symbolIndex].is_section = 0;
+				symbolTable[symbolIndex].sectionIndex = currSection;
+				symbolTable[symbolIndex].st_size = 0;
+			}
+			else
+			{
+				symbolIndex = makeSymbolTableEntry(tok);
+				symbolTable[symbolIndex].sectionIndex = currSection;
+			}
+		}	
+		else if(myType == SECTION || myType == SUBSECTION)
+		{
+			symbolIndex = makeSymbolTableEntry(tok);
 			sectionIndex = makeSectionTableEntry(tok, symbolTable[symbolIndex].st_name);
+			symbolTable[symbolTableSize - 1].sectionIndex = sectionIndex;
+			currSection = sectionIndex;
+			symbolTable[symbolIndex].sectionIndex = sectionIndex;
+		}
 
-		symbolTable[symbolIndex].st_shndx = sectionIndex;
-
-		printSymbolTable();
-		printSectionTable();
+		//printSymbolTable();
+		//printSectionTable();
 	}
 	else if(prevToken != 0)
 	{
-		if( strcmp(prevToken->token, ".extern") == 0 && tok->tokenType == SYMBOL)
+		if( (strcmp(prevToken->token, ".extern") == 0) && tok->tokenType == SYMBOL)
 		{
 			int symbolIndex = makeSymbolTableEntry(tok);
-			symbolTable[symbolIndex].st_shndx = 0;
+			symbolTable[symbolIndex].sectionIndex = 0; /// ????
+			symbolTable[symbolIndex].is_extern = 1;
+			symbolTable[symbolIndex].is_global = 1;
+		}
+		if(strcmp(prevToken->token, ".public") == 0 && tok->tokenType == SYMBOL)
+		{
+			int i;
+			int is_defined = 0;
+			for(i = 0; i < symbolTableSize; i++)
+			{
+				if(strcmp(tok->token, &stringTable[symbolTable[i].st_name]) == 0)
+				{
+					is_defined = 1;
+					break;
+				}
+			}
+			if(is_defined == 1)
+				symbolTable[i].is_global = 1;
+			else
+			{
+				int symbolIndex = makeSymbolTableEntry(tok);
+				symbolTable[symbolIndex].sectionIndex = 0; /// ????
+				symbolTable[symbolIndex].is_extern = 0;
+				symbolTable[symbolIndex].is_global = 1;
+			}
 		}
 
 	}
@@ -262,8 +386,8 @@ token* createEntry(type t)
 		}
 	}
 
-	if(tok->tokenType != SYMBOL)
-		prevToken = tok;
+	// if(tok->tokenType != SYMBOL)
+	// 	prevToken = tok;
 
 	if(tokensCnt == 0)
 		tokens = (token**) malloc(sizeof(token*));
@@ -355,13 +479,10 @@ token* makeToken(type ty)
 		t->tokenType = LABEL;
 		return t;
 	}
-	else if(prevToken != 0)
+	else if(isCondition(tok) != NO)
 	{
-		if(prevToken->tokenType == MNEMONIC)
-		{
-			t->tokenType = CONDITION;
-			return t;
-		}
+		t->tokenType = CONDITION;
+		return t;
 	}
 	if(ty == OPERAND)
 	{	

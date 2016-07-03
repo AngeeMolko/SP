@@ -15,8 +15,6 @@ int main()
 	fclose(file);
 	printf("Fajl zatvoren!\n");
 
-	fseek(file, 0, SEEK_SET);
-
 	secondPass();
 
 	int i;
@@ -24,4 +22,7 @@ int main()
 		printf("Instr %x\n", textSection[i]);
 	printSymbolTable();
 	printSectionTable();
+
+	if(relocationTable != 0)
+		printf("%d", relocationTable[1][0].symbol);
 }
